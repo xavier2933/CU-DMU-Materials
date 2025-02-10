@@ -1,6 +1,6 @@
 using DMUStudent.HW2
 using POMDPs: states, actions, transition, stateindex
-using POMDPTools: ordered_states, POMDPDistributions
+using POMDPTools: ordered_states, POMDPDistributions, Deterministic, render
 using LinearAlgebra
 
 function lookahead(prob, R::Dict, U::Vector, s, a, gamma)
@@ -8,7 +8,7 @@ function lookahead(prob, R::Dict, U::Vector, s, a, gamma)
     s_idx = stateindex(prob, s)
 
     # Check if transition is deterministic @chatGPT
-    if dist isa POMDPTools.POMDPDistributions.Deterministic
+    if dist isa Deterministic
         sp = dist.val
         return R[a][s_idx] + gamma * U[stateindex(prob, sp)]
     else
@@ -16,13 +16,13 @@ function lookahead(prob, R::Dict, U::Vector, s, a, gamma)
     end
 end
 
-
 function backup(prob, R::Dict, U::Vector, s, gamma)
     actionz = actions(prob)
 
     return maximum(lookahead(prob, R, U, s, a, gamma) for a in actionz)
 end
 
+# Old version too slow not used
 function value_iteration(prob; gamma=0.95, epsilon=0.01)
     # T = transition_matrices(prob)
 
@@ -47,48 +47,33 @@ function solve(prob; gamma=0.99, epsilon=0.1, k_max=1000)
 
     V = zeros(length(states_set))
     it = 0
+    dx = epsilon+1
 
-    while true
-        Δ = 0
+    while dx > epsilon && it <= k_max
+        Vp = copy(V)
         for s in states_set
             s_idx = stateindex(prob, s)
-            V_old = V[s_idx]
 
             V[s_idx] = backup(prob, R, V, s, gamma)
-
-            Δ = max(Δ, abs(V_old - V[s_idx]))
         end
-
+        dx = norm(V .- Vp, Inf)
         it += 1
-        println("Iteration: $it, Max Change: $Δ")
-
-        if Δ < epsilon || it >= k_max
-            break
-        end
+        println("Iteration: $it, Max Change: $dx")
     end
 
     return V
 end
 
-
-# ### GPT generated example to help with debugging
-# s = 1
-# a = :right
-# gamma = 0.95
-# U = rand(length(R[:right]))
-
-# lookahead_value = lookahead(T, R, U, s, a, gamma)
-# println("Lookahead value for state $s taking action $a: $lookahead_value")
-
 """
-Call value iteration fxn, plot
+Call funcs
 """
-V = solve(grid_world)
-# println("Final Value Function: ", V)
-POMDPTools.ModelTools.render(HW2.grid_world, color = V)
+## Q3
+V = solve(grid_world;gamma=0.95)
 
-# display(render(grid_world, color=V))
-println("running big prob")
+println("Final Value Function: ", V)
+display(render(HW2.grid_world, color = V))
+
+## Q4
 m = UnresponsiveACASMDP(7)
 VP = solve(m)
 
