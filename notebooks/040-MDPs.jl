@@ -95,16 +95,16 @@ states(m)
 actions(m) # things that begin with a colon (:) are called "Symbols"; they are short interned strings
 
 # ╔═╡ 65f5b00e-a8e4-4cd5-9198-f6c06bfc6c8a
-reward(m, [4,3], :right) # reward(m, s, a)
+reward(m, [9, 3], :right) # reward(m, s, a)
 
 # ╔═╡ decdb9f4-b5c5-4293-b779-7cad69eb30f7
 reward(m, [4,3], :right, [5,3]) # reward(m, s, a, sp)
 
 # ╔═╡ 4e37e8f0-f50f-4391-b415-0803309de130
-transition(m, [1,1], :right)
+transition(m, [8,3], :right)
 
 # ╔═╡ 84746d54-ce14-4b68-8cb3-478e04003308
-@gen(:sp, :r)(m, [4,3], :right)
+@gen(:sp, :r)(m, [8,3], :right)
 
 # ╔═╡ 782b77a1-1098-47ad-838e-3cd721f17ca4
 discount(m)
@@ -142,7 +142,13 @@ md"""
 
 # ╔═╡ 8f47d8a0-feb5-4b75-b7ac-a36eeec5af97
 function policy_function(s)
-	return :right
+	if s[1] < 9
+		return :right
+	elseif s[2] > 3
+		return :down
+	else
+		return :left
+	end
 end
 
 # ╔═╡ d51a88a1-b729-4ea1-82cc-19603099eb78
@@ -202,7 +208,7 @@ begin
 	for s in support(b)
 	    U_pi_initial_state += pdf(b, s)*U_pi[stateindex(m, s)]
 	end
-	U_pi_initial_state # Compare to meain of MC evaluation above
+	U_pi_initial_state # Compare to mean of MC evaluation above
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
