@@ -4,6 +4,7 @@ using D3Trees: inchrome, inbrowser
 using StaticArrays: SA
 using Statistics: mean, std
 using BenchmarkTools: @btime
+using Profile
 
 m = HW3.DenseGridWorld()
 
@@ -80,7 +81,7 @@ function (pi::MonteCarloTreeSearch)(s)
 end
 
 function simulate!(π::MonteCarloTreeSearch, s, d=π.d)
-    if d ≤ 0
+    if d < 1
         return π.U(s)
     end
     # println("SIMULATE")
@@ -162,8 +163,11 @@ println("S' = $sp")
 # A starting point for the MCTS select_action function (a policy) which can be used for Questions 4 and 5
 function select_action(m, s)
     start = time_ns()
-    S = statetype(m)
-    A = actiontype(m)
+    # S = statetype(m)
+    # A = actiontype(m)
+    # n = Dict{Tuple{Int, Int}, Int}()  # Preallocate with expected key types
+    # q = Dict{Tuple{Int, Int}, Float64}()
+
     n = Dict{Tuple{S, A}, Int}()
     q = Dict{Tuple{S, A}, Float64}()
 
@@ -172,7 +176,7 @@ function select_action(m, s)
         P=m, # problem
         N=n, # visit counts
         Q=q, # action value estimates
-        d=10, # depth
+        d=7, # depth
         m=100, # number of simulations
         c=1.0, # exploration constant
         U=s -> 0.0 # default value function estimate
@@ -187,13 +191,16 @@ function select_action(m, s)
     end
 
     # Select the best action based on Q values
-    best_action = argmax(a -> q[(s, a)], actions(m))
+        best_action = argmax(a -> q[(s, a)], actions(m))
     println("Best action $best_action")
     return best_action
 end
 
 
+@profview select_action(m, SA[35,35]) # you can use this to see how much time your function takes to run. A good time is 10-20ms.
 # @btime select_action(m, SA[35,35]) # you can use this to see how much time your function takes to run. A good time is 10-20ms.
 
 # use the code below to evaluate the MCTS policy
-@show results = [rollout(m, select_action, rand(initialstate(m)), 100) for _ in 1:100]
+# @show results = [rollout(m, select_action, rand(initialstate(m)), 100) for _ in 1:100]
+
+# HW3.evaluate(select_action, "xavier.okeefe@colorado.edu")
