@@ -92,20 +92,24 @@ function simulate!(π::MonteCarloTreeSearch, s, d=π.d)
             N[(s,a)] = 0
             Q[(s,a)] = 0.0
         end
-        return π.U(s)
+        return Float64(π.U(s))
     end
     a = explore(π, s)
     sp, r = @gen(:sp, :r)(P, s, a)
-    # println("Next state: ", sp)
+
+    r = Float64(r)
+    # println("Next state: ", sp)the
     # println("Reward: ", r)
-    q = r +γ*simulate!(π, sp, d-1)
+    next_q = simulate!(π, sp, d - 1)  # Ensure this is Float64
+    q = r + γ * next_q  # This should now be type-stable
     N[(s,a)] +=1
-    Q[(s,a)] +=(q-Q[(s,a)])/N[(s,a)]
+    Q[(s, a)] = get!(Q, (s, a), 0.0) + (q - Q[(s, a)]) / N[(s, a)]
     return q
 end
 
 
 bonus(Nsa, Ns) = Nsa == 0 ? Inf : sqrt(log(Ns) / Nsa)
+
 
 function explore(π::MonteCarloTreeSearch, s)
     𝒜, N, Q, c = actions(π.P), π.N, π.Q, π.c
@@ -177,7 +181,7 @@ function select_action(m, s)
         N=n, # visit counts
         Q=q, # action value estimates
         d=7, # depth
-        m=100, # number of simulations
+        m=200, # number of simulations
         c=1.0, # exploration constant
         U=s -> 0.0 # default value function estimate
     )
@@ -191,16 +195,19 @@ function select_action(m, s)
     end
 
     # Select the best action based on Q values
-        best_action = argmax(a -> q[(s, a)], actions(m))
-    println("Best action $best_action")
+    best_action = argmax(a -> q[(s::S, a::A)], actions(m))
+
+    # println("Best action $best_action")
     return best_action
 end
 
 
 @profview select_action(m, SA[35,35]) # you can use this to see how much time your function takes to run. A good time is 10-20ms.
+@profview select_action(m, SA[35,35]) # you can use this to see how much time your function takes to run. A good time is 10-20ms.
+
 # @btime select_action(m, SA[35,35]) # you can use this to see how much time your function takes to run. A good time is 10-20ms.
 
 # use the code below to evaluate the MCTS policy
 # @show results = [rollout(m, select_action, rand(initialstate(m)), 100) for _ in 1:100]
 
-# HW3.evaluate(select_action, "xavier.okeefe@colorado.edu")
+HW3.evaluate(select_action, "xavier.okeefe@colorado.edu")
