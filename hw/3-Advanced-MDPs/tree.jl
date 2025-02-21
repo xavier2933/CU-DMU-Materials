@@ -65,7 +65,7 @@ function simulate!(π::MonteCarloTreeSearch, s, t, d=π.d)
     P, N, Q, c = π.P, π.N, π.Q, π.c
     𝒜, γ = actions(P), P.discount
 
-    if !all(haskey(N, (s, a)) for a in 𝒜)
+    if !haskey(N, (s, first(𝒜)))
         for a in 𝒜
             N[(s, a)] = 0
             Q[(s, a)] = 0.0
@@ -89,6 +89,7 @@ function bonus(Nsa, Ns)
     return Nsa == 0 ? Inf : sqrt(log(Ns) / Nsa)
 end
 
+
 function explore(π, s)
     𝒜, N, Q, c = actions(π.P), π.N, π.Q, π.c
     Ns = sum(N[(s, a)] for a in 𝒜)
@@ -103,39 +104,48 @@ function explore(π, s)
     return argmax(a -> Q[(s, a)] + c * bonus(N[(s, a)], Ns), 𝒜)
 end
 
-m = HW3.DenseGridWorld()
 
-@show S = statetype(m)
-@show A = actiontype(m)
+#############
+# Question 3
+##############
+# m = HW3.DenseGridWorld()
 
-n = Dict{Tuple{S, A}, Int}()
-q = Dict{Tuple{S, A}, Float64}()
-t = Dict{Tuple{S, A, S}, Int}()
+# @show S = statetype(m)
+# @show A = actiontype(m)
 
-π = MonteCarloTreeSearch(
-    P=m, # problem
-    N=n, # visit counts
-    Q=q, # action value estimates
-    d=7, # depth
-    m=20, # number of simulations
-    c=1.0, # exploration constant
-    U=s -> 0.0 # default value function estimate
-)
+# n = Dict{Tuple{S, A}, Int}()
+# q = Dict{Tuple{S, A}, Float64}()
+# t = Dict{Tuple{S, A, S}, Int}()
 
-s = SA[19, 19]
-for i in 1:π.m
-    @show t
-    simulate!(π, s, t, π.d)
-end
+# π = MonteCarloTreeSearch(
+#     P=m, # problem
+#     N=n, # visit counts
+#     Q=q, # action value estimates
+#     d=3, # depth
+#     m=7, # number of simulations
+#     c=1.0, # exploration constant
+#     U=s -> 0.0 # default value function estimate
+# )
 
+# s = SA[21, 21]
+# for i in 1:π.m
+#     # @show t
+#     simulate!(π, s, t, π.d)
+# end
+
+# @show maximum(values(q))
 # t[(SA[19,19], :right, SA[20,19])] = 1
 
 # println(n)
 # println(q)
 # println(t)
 
-inchrome(visualize_tree(q, n, t, SA[19, 19]))
+# inchrome(visualize_tree(q, n, t, s))
 
+
+###############
+# Question 4
+#################
 
 function select_action(m, s)
     start = time_ns()
@@ -155,24 +165,34 @@ function select_action(m, s)
         N=n, # visit counts
         Q=q, # action value estimates
         d=7, # depth
-        m=400, # number of simulations
-        c=1.1, # exploration constant
-        U=s -> 0.0 # default value function estimate
+        m=500, # number of simulations
+        c=200, # exploration constant
+        U=s -> rollout(m, heuristic_policy, s)
     )
 
     # Run MCTS iterations
-    for i in 1:1000
-        while time_ns() < start + 40_000_000 # uncomment this line to limit the loop to 40ms
-            simulate!(π, s, t)
-        end
+    for i in 1:π.m
+        # while time_ns() < start + 40_000_000 # uncomment this line to limit the loop to 40ms
+        simulate!(π, s, t)
+        # end
         # println("iteration $i")
     end
 
     # Select the best action based on Q values
-    best_action = argmax(a -> q[(s::S, a::A)], actions(m))
+    @show maximum(get(q, (s, a), -Inf) for a in actions(m))
+    best_action = argmax(a -> get(q, (s, a), -Inf), actions(m))
+    # inchrome(visualize_tree(q, n, t, s))
 
     # println("Best action $best_action")
     return best_action
 end
 
-# HW3.evaluate(select_action, "xavier.okeefe@colorado.edu")
+
+
+m = HW3.DenseGridWorld()
+s = SA[20,24]
+# @show rollout(m, select_action, s)
+# # inchrome(visualize_tree(q, n, t, s))
+# @btime action = select_action(m, s)
+
+HW3.evaluate(select_action, "xavier.okeefe@colorado.edu", time = true)
