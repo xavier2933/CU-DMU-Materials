@@ -5,6 +5,7 @@ using StaticArrays: SA
 using Statistics: mean, std
 using BenchmarkTools: @btime
 using Profile
+using JET
 
 struct MonteCarloTreeSearch
     P # problem
@@ -20,13 +21,6 @@ function MonteCarloTreeSearch(; P, N, Q, d, m, c, U)
     return MonteCarloTreeSearch(P, N, Q, d, m, c, U)
 end
 
-# function (pi::MonteCarloTreeSearch)(s)
-#     for k in 1:pi.m
-#         simulate!(pi, s, t)
-#     end
-#     return argmax(a -> pi.Q[(s, a)], actions(pi.P))
-# end
-
 function rollout(mdp, policy_function, s0, max_steps=10000)
     r_total = 0.0
     t = 0
@@ -37,7 +31,7 @@ function rollout(mdp, policy_function, s0, max_steps=10000)
         r_total += discount(mdp)^t * r
         t += 1
     end
-    return r_total
+    return Float64(r_total)
 end
 
 function heuristic_policy(m, s)
@@ -56,10 +50,15 @@ function heuristic_policy(m, s)
     return rand(actions(m))
 end
 
-function simulate!(π::MonteCarloTreeSearch, s, t, d=π.d)
+function random_policy(m,s)
+    return rand(actions(m))
+end
+
+# Copy pasted some of these from the book, should have changed letters
+function simulate!(π::MonteCarloTreeSearch, s, t, d::Int=π.d)
     if d < 1
         # println("Terminating at depth d = $d")
-        return π.U(s)
+        return Float64(π.U(s))
     end
 
     P, N, Q, c = π.P, π.N, π.Q, π.c
@@ -94,21 +93,27 @@ function explore(π, s)
     𝒜, N, Q, c = actions(π.P), π.N, π.Q, π.c
     Ns = sum(N[(s, a)] for a in 𝒜)
     
-    for a in 𝒜
-        q_value = Q[(s, a)]
-        bonus_value = c * bonus(N[(s, a)], Ns)
-        total_value = q_value + bonus_value
-        # println("Action: ", a, " | Q: ", q_value, " | Bonus: ", bonus_value, " | Total: ", total_value)
-    end
-    
     return argmax(a -> Q[(s, a)] + c * bonus(N[(s, a)], Ns), 𝒜)
 end
+
+#############
+# Question 2
+#############
+
+# m = HW3.DenseGridWorld(seed=3)
+
+# println(actions(m))
+# # This code runs monte carlo simulations: you can calculate the mean and standard error from the results
+# results = [rollout(m, random_policy, rand(initialstate(m))) for _ in 1:1000]
+
+# println("MEAN: ", mean(results))
+# println("SEM: ", std(results)/sqrt(length(results)))
 
 
 #############
 # Question 3
 ##############
-# m = HW3.DenseGridWorld()
+# m = HW3.DenseGridWorld(seed=4)
 
 # @show S = statetype(m)
 # @show A = actiontype(m)
@@ -123,15 +128,17 @@ end
 #     Q=q, # action value estimates
 #     d=3, # depth
 #     m=7, # number of simulations
-#     c=1.0, # exploration constant
+#     c=1, # exploration constant
 #     U=s -> 0.0 # default value function estimate
 # )
 
-# s = SA[21, 21]
+# s = SA[19,19]
 # for i in 1:π.m
 #     # @show t
 #     simulate!(π, s, t, π.d)
 # end
+
+# inchrome(visualize_tree(q, n, t, s))
 
 # @show maximum(values(q))
 # t[(SA[19,19], :right, SA[20,19])] = 1
@@ -139,9 +146,6 @@ end
 # println(n)
 # println(q)
 # println(t)
-
-# inchrome(visualize_tree(q, n, t, s))
-
 
 ###############
 # Question 4
@@ -165,10 +169,10 @@ function select_action(m, s)
         N=n, # visit counts
         Q=q, # action value estimates
         d=7, # depth
-        m=500, # number of simulations
-        c=200, # exploration constant
-        U=s -> rollout(m, heuristic_policy, s)
-    )
+        m=300, # number of simulations
+        c=190, # exploration constant
+        U=s -> Float64(rollout(m, heuristic_policy, s))  # Ensure Float64 output
+        )
 
     # Run MCTS iterations
     for i in 1:π.m
@@ -179,7 +183,7 @@ function select_action(m, s)
     end
 
     # Select the best action based on Q values
-    @show maximum(get(q, (s, a), -Inf) for a in actions(m))
+    # @show maximum(get(q, (s, a), -Inf) for a in actions(m))
     best_action = argmax(a -> get(q, (s, a), -Inf), actions(m))
     # inchrome(visualize_tree(q, n, t, s))
 
@@ -190,9 +194,22 @@ end
 
 
 m = HW3.DenseGridWorld()
+
+# @show results = [rollout(m, select_action, rand(initialstate(m)), 100) for _ in 1:100]
+# println("MEAN: ", mean(results))
+# println("SEM: ", std(results)/sqrt(length(results)))
+
 s = SA[20,24]
 # @show rollout(m, select_action, s)
 # # inchrome(visualize_tree(q, n, t, s))
 # @btime action = select_action(m, s)
+
+# @profview select_action(m, s)
+select_action(m, s)
+select_action(m, s)
+
+# @report_opt simulate!(π, s, t, 5)
+
+
 
 HW3.evaluate(select_action, "xavier.okeefe@colorado.edu", time = true)
