@@ -265,7 +265,7 @@ function run_experiment(num_episodes=100_000)
     q_episodes = q_learning!(env, n_episodes=num_episodes, α=0.1)
     
     println("Running SARSA with $num_episodes episodes...")
-    sarsa_episodes = sarsa!(env, n_episodes=num_episodes, α=0.2)
+    sarsa_episodes = sarsa!(env, n_episodes=num_episodes, α=0.1)
     
     # println("Running SARSA-λ with $num_episodes episodes...")
     # lambda_episodes = sarsa_lambda!(env, n_episodes=num_episodes, α=0.1, λ=0.9)
@@ -289,7 +289,7 @@ function run_experiment(num_episodes=100_000)
 end
 
 
-steps_plot, time_plot = run_experiment(400000)
+steps_plot, time_plot = run_experiment(500000)
 
 display(steps_plot)
 display(time_plot)
