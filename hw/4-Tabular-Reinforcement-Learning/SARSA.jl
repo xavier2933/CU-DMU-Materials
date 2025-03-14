@@ -30,7 +30,7 @@ function q_learning_episode!(Q, env; ϵ=0.10, γ=0.99, α=0.2)
     cumulative_reward = r
 
     while !terminated(env)
-        # Use max q val
+        # Use max q instead of policy
         max_q = maximum(Q[(sp, ap)] for ap in actions(env))
         Q[(s,a)] += α*(r + γ*max_q - Q[(s, a)])
 
