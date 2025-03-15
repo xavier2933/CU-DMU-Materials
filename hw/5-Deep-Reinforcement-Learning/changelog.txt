@@ -1,0 +1,10 @@
+learning rate 0.0005 -> 0.001 - no meaningful difference
+epsilon-decay 0.99 -> 0.95 - maybe too much decay
+update_freq 100 -> 50 - potentially heled?
+learning rate 0.001 -> 0.002 - couple very good episodes
+update freq 50 -> 20 - no change still around -14
+decay rate 0.98 -> 0.95 - potentially trending up?
+decay rate 0.95 -> 0.94 - 
+kearning rate 0.002 -> 0.005
+0.005 -> 0.0035
+batch size -> 128 - not much impact

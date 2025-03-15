@@ -10,6 +10,7 @@ using CommonRLInterface.Wrappers: QuickWrapper
 using TensorBoardLogger
 using Logging
 using Statistics
+using CUDA
 
 # The following are some basic components needed for DQN
 
@@ -18,11 +19,21 @@ env = QuickWrapper(HW5.mc,
                    actions=[-1.0, -0.5, 0.0, 0.5, 1.0],
                    observe=mc->observe(mc)[1:2]
                   )
-
 function dqn(env)
+    # Check if CUDA is available and use GPU if it is
+    use_gpu = try
+        CUDA.functional()
+        CUDA.allowscalar(true)
+    catch
+        false
+    end
+    
+    device = use_gpu ? gpu : cpu
+    println("Using device: ", use_gpu ? "GPU" : "CPU")
+    
     # This network should work for the Q function - an input is a state; the output is a vector containing the Q-values for each action 
     Q = Chain(Dense(2, 128, relu),
-              Dense(128, length(actions(env))))
+                Dense(128, length(actions(env)))) |> device
 
     opt = Flux.setup(ADAM(0.0005), Q)
     lg = TBLogger("tensorboard_logs/dqn_run", min_level=Logging.Info)
@@ -43,34 +54,56 @@ function dqn(env)
     # this is the fixed target Q network
     Q_target = deepcopy(Q)
 
-    # create your loss function for Q training here
-    function loss(Q, s, a_ind, r, sp, done)
-        curr = Q(s)[a_ind]
-        if done
-            println("Reached goal, done")
-            target = r
+    # Modified loss function to avoid scalar indexing on GPU
+    function compute_loss(s, a_ind, r, sp, done)
+        # Move data to appropriate device
+        s_tensor = use_gpu ? reshape(Float32.(s), :, 1) |> gpu : s
+        sp_tensor = use_gpu ? reshape(Float32.(sp), :, 1) |> gpu : sp
+        
+        # Forward pass to get all Q values
+        current_q_values = Q(s_tensor)
+        
+        # Move to CPU to extract the relevant Q value
+        if use_gpu
+            current_q = Array(current_q_values)[a_ind]
         else
-            target = r + 0.99 * maximum(Q(sp))
+            current_q = current_q_values[a_ind]
         end
-
-        return (target - curr)^2
+        
+        # Calculate target Q value
+        target = if done
+            r
+        else
+            next_q_values = Q_target(sp_tensor)
+            # Move to CPU to find maximum
+            next_q_max = use_gpu ? maximum(Array(next_q_values)) : maximum(next_q_values)
+            r + gamma * next_q_max
+        end
+        
+        # Return squared error
+        return (target - current_q)^2
     end
 
     episode = 0
     steps = 0
-    steps_per_ep = 400
+    steps_per_ep = 300
     println("Entering training")
-    for episode = 1:200
+    for episode = 1:75
         reset!(env)
         s = observe(env)
-        reward= 0
+        reward = 0
         episode_loss = []
         q_values = []
         for step = 1:steps_per_ep
+            # For action selection
+            s_tensor = use_gpu ? reshape(Float32.(s), :, 1) |> gpu : s
+            
             if rand() < epsilon
                 a_ind = rand(1:length(actions(env)))
             else
-                a_ind = argmax(Q(s))
+                # Get Q values and move to CPU for argmax
+                q_vals = use_gpu ? Array(Q(s_tensor)) : Q(s_tensor)
+                a_ind = argmax(q_vals)
             end
 
             a = actions(env)[a_ind]
@@ -78,24 +111,43 @@ function dqn(env)
             sp = observe(env)
             done = terminated(env)
 
+            # Store experience in CPU memory
             experience = (s, a_ind, r, sp, done)
             if length(buffer) < buffer_size
-                # if length(buffer) % 100 == 0
-                #     println("Buffer size: $(length(buffer))")
-                # end
                 push!(buffer, experience)
             else
-                popfirst!(buffer)
+                # Replace random experience
+                idx = rand(1:buffer_size)
+                buffer[idx] = experience
             end
 
             if length(buffer) >= batch_size
+                # Train on a batch
                 indices = rand(1:length(buffer), batch_size)
-                minibatch = buffer[indices]
-                Flux.Optimise.train!(loss, Q, minibatch, opt)
+                batch_loss = 0.0
+                
+                # Custom batch training loop to avoid scalar indexing
+                for i in indices
+                    exp = buffer[i]
+                    # Gradients and update for this experience
+                    gs = Flux.gradient(Q) do q
+                        loss_val = compute_loss(exp[1], exp[2], exp[3], exp[4], exp[5])
+                        batch_loss += loss_val
+                        return loss_val
+                    end
+                    Flux.Optimisers.update!(opt, Q, gs[1])
+                end
+                
+                push!(episode_loss, batch_loss/batch_size)
             end
-            curr_loss = loss(Q, s, a_ind, r, sp, done)
+            
+            # For logging current Q values
+            curr_loss = compute_loss(s, a_ind, r, sp, done)
             push!(episode_loss, curr_loss)
-            push!(q_values, maximum(Q(s)))
+            
+            # Get max Q value for logging
+            q_vals = use_gpu ? Array(Q(s_tensor)) : Q(s_tensor)
+            push!(q_values, maximum(q_vals))
 
             s = sp
             reward += r
@@ -113,34 +165,17 @@ function dqn(env)
         end
         epsilon = max(epsilon_min, epsilon * epsilon_decay)
 
-        if episode %1 == 0
+        if episode % 1 == 0
             println("Ep: $episode, Reward = $reward, epsilon = $epsilon")
         end
-        # display(render(env))
+        
         push!(episode_rewards, reward)
         with_logger(lg) do
             @info "training" reward=reward episode=episode avg_loss=mean(episode_loss) max_q=maximum(q_values) min_q=minimum(q_values) avg_q=mean(q_values) epsilon=epsilon
         end
     end
-
-    p = plot(1:length(episode_rewards), episode_rewards, 
-     xlabel="Episode", 
-     ylabel="Total Reward", 
-     title="DQN Learning Curve",
-     legend=false,
-     linewidth=2)
-
-    # Add a trend line to better visualize progress
-    window_size = min(30, length(episode_rewards))
-    moving_avg = [mean(episode_rewards[max(1, i-window_size+1):i]) for i in 1:length(episode_rewards)]
-    plot!(p, 1:length(moving_avg), moving_avg, 
-        linewidth=3, 
-        linestyle=:dash, 
-        color=:red, 
-        label="Moving Average")
-
-    display(p)
-    return Q
+    # Return the model on CPU for evaluation
+    return use_gpu ? cpu(Q) : Q
 end
 
 Q = dqn(env)
