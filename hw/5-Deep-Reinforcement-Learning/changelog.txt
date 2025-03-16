@@ -8,3 +8,17 @@ decay rate 0.95 -> 0.94 -
 kearning rate 0.002 -> 0.005
 0.005 -> 0.0035
 batch size -> 128 - not much impact
+
+
+stuff running on vscode is 0.0012 learning rate
+terminal is 0.0005
+
+left tab e = 0.995 rate = 0.001 - 33.4
+right e = 0.992, rate = 0.0009 - s9.1
+left is e =0.995 rate = 0.0009 - 33.3
+right is e = 0.995 rate = 0.001 -> 42.5  run 25
+left buffer size 50000 -> 75000, batch size 128->256 
+
+episodes -> 1250 -> 2000
+network nodes 256-> 512
+batch size 128
