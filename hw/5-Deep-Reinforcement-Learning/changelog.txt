@@ -17,8 +17,23 @@ left tab e = 0.995 rate = 0.001 - 33.4
 right e = 0.992, rate = 0.0009 - s9.1
 left is e =0.995 rate = 0.0009 - 33.3
 right is e = 0.995 rate = 0.001 -> 42.5  run 25
+    opt = Flux.setup(ADAM(0.001), Q)
+    lg = TBLogger("tensorboard_logs/dqn_run", min_level=Logging.Info)
+
+    gamma = 0.99
+    buffer_size = 50000
+    batch_size = 128
+    update_freq = 1000
+    epsilon = 1.0
+    epsilon_min = 0.05
+    epsilon_decay = 0.995
+
+    episodes = 1250
+
+
 left buffer size 50000 -> 75000, batch size 128->256 
 
+right
 episodes -> 1250 -> 2000
 network nodes 256-> 512
 batch size 128

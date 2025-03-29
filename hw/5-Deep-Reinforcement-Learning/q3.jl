@@ -78,12 +78,15 @@ function dqn(env)
             done = terminated(env)
 
             shaped_reward = r
+
+            # I actually don't think I used this to get my best JSON file, did not have as
+            # much impact as I expected
             if !done
-                shaped_reward += sp[1] * 0.1  # Small bonus for height
-                if sp[1] < 0 && sp[2] > 0  # If on left side and moving right
-                    shaped_reward += sp[2] * 0.05  # Small bonus for good velocity
-                elseif sp[1] >= 0 && sp[2] > 0  # If on right side and moving right
-                    shaped_reward += sp[2] * 0.1  # Larger bonus
+                shaped_reward += sp[1] * 0.1  # height bonus
+                if sp[1] < 0 && sp[2] > 0  # left -> right
+                    shaped_reward += sp[2] * 0.05  # more velocity
+                elseif sp[1] >= 0 && sp[2] > 0  # right -> left
+                    shaped_reward += sp[2] * 0.1  # larger bonus for more velocity in this direction
                 end
             end
     
@@ -133,6 +136,7 @@ function dqn(env)
         end
     end
 
+    # ChatGPT for plotting
     p = plot(1:length(episode_rewards), episode_rewards, 
      xlabel="Episode", 
      ylabel="Total Reward", 

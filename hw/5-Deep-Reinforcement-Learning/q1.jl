@@ -22,7 +22,7 @@ differ from this considerably.
 
 # The tiger problem from http://www.sciencedirect.com/science/article/pii/S000437029800023X can be expressed with:
 
-tiger = QuickPOMDP(
+cancerMonitor = QuickPOMDP(
     states = [:Healthy, :InSitu, :Invasive, :Death],
     actions = [:wait, :test, :treat],
     observations = [:positive, :negative],
@@ -87,7 +87,7 @@ tiger = QuickPOMDP(
 )
 
 # evaluate with a random policy
-@show POMDPs.actions(tiger)
+@show POMDPs.actions(cancerMonitor)
 policy = FunctionPolicy(o->:wait)
 sim = RolloutSimulator(max_steps=100)
-@show @time mean(POMDPs.simulate(sim, tiger, policy) for _ in 1:10_000)
+@show @time mean(POMDPs.simulate(sim, cancerMonitor, policy) for _ in 1:10_000)
