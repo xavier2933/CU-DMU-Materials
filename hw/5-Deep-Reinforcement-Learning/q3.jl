@@ -21,19 +21,19 @@ env = QuickWrapper(HW5.mc,
 
 function dqn(env)
     # This network should work for the Q function - an input is a state; the output is a vector containing the Q-values for each action 
-    Q = Chain(Dense(2, 128, relu),
-              Dense(128, length(actions(env))))
+    Q = Chain(Dense(2, 512, relu),
+              Dense(512, length(actions(env))))
 
-    opt = Flux.setup(ADAM(0.0005), Q)
+    opt = Flux.setup(ADAM(0.001), Q)
     lg = TBLogger("tensorboard_logs/dqn_run", min_level=Logging.Info)
 
     gamma = 0.99
-    buffer_size = 50000
+    buffer_size = 75000
     batch_size = 128
-    update_freq = 200
+    update_freq = 1000
     epsilon = 1.0
     epsilon_min = 0.05
-    epsilon_decay = 0.98
+    epsilon_decay = 0.995
 
     episode_rewards = []
     buffer = []
@@ -47,7 +47,6 @@ function dqn(env)
     function loss(Q, s, a_ind, r, sp, done)
         curr = Q(s)[a_ind]
         if done
-            println("Reached goal, done")
             target = r
         else
             target = r + 0.99 * maximum(Q(sp))
@@ -58,9 +57,9 @@ function dqn(env)
 
     episode = 0
     steps = 0
-    steps_per_ep = 400
+    steps_per_ep = 500
     println("Entering training")
-    for episode = 1:200
+    for episode = 1:2000
         reset!(env)
         s = observe(env)
         reward= 0
@@ -78,7 +77,21 @@ function dqn(env)
             sp = observe(env)
             done = terminated(env)
 
-            experience = (s, a_ind, r, sp, done)
+            shaped_reward = r
+
+            # I actually don't think I used this to get my best JSON file, did not have as
+            # much impact as I expected
+            if !done
+                shaped_reward += sp[1] * 0.1  # height bonus
+                if sp[1] < 0 && sp[2] > 0  # left -> right
+                    shaped_reward += sp[2] * 0.05  # more velocity
+                elseif sp[1] >= 0 && sp[2] > 0  # right -> left
+                    shaped_reward += sp[2] * 0.1  # larger bonus for more velocity in this direction
+                end
+            end
+    
+            experience = (s, a_ind, shaped_reward, sp, done) 
+
             if length(buffer) < buffer_size
                 # if length(buffer) % 100 == 0
                 #     println("Buffer size: $(length(buffer))")
@@ -98,7 +111,7 @@ function dqn(env)
             push!(q_values, maximum(Q(s)))
 
             s = sp
-            reward += r
+            reward += shaped_reward
             steps += 1
 
             if step % update_freq == 0
@@ -123,6 +136,7 @@ function dqn(env)
         end
     end
 
+    # ChatGPT for plotting
     p = plot(1:length(episode_rewards), episode_rewards, 
      xlabel="Episode", 
      ylabel="Total Reward", 
