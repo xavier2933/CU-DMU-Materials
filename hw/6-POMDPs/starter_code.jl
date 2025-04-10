@@ -141,7 +141,7 @@ qmdp_p = qmdp_solve(m)
 up = DiscreteUpdater(m) # you may want to replace this with your updater to test it
 
 # Use this version with only 100 episodes to check how well you are doing quickly
-@show HW6.evaluate((qmdp_p, up), n_episodes=100)
+# @show HW6.evaluate((qmdp_p, up), n_episodes=100)
 
 # A good approach to try is POMCP, implemented in the BasicPOMCP.jl package:
 using BasicPOMCP
