@@ -25,8 +25,12 @@ function dqn(env)
               Dense(512, length(actions(env))))
 
     opt = Flux.setup(ADAM(0.001), Q)
+
+    # set up tensorboard
     lg = TBLogger("tensorboard_logs/dqn_run", min_level=Logging.Info)
 
+
+    # These were the params I messed with
     gamma = 0.99
     buffer_size = 75000
     batch_size = 128
@@ -46,6 +50,8 @@ function dqn(env)
     # create your loss function for Q training here
     function loss(Q, s, a_ind, r, sp, done)
         curr = Q(s)[a_ind]
+
+        # correct terminatio
         if done
             target = r
         else

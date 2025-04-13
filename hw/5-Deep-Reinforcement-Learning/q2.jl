@@ -8,7 +8,7 @@ using Statistics
 
 f(x) = (1 - x) * sin(20 * log(x + 0.2))
 
-n = 500
+n = 700
 dx = rand(Float32, n)
 dy = convert.(Float32, f.(dx))
 

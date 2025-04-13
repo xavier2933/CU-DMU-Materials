@@ -7,6 +7,7 @@ using NativeSARSOP: SARSOPSolver
 using POMDPTesting: has_consistent_distributions
 using Plots
 using StatsPlots
+using QMDP
 
 
 ##################
@@ -34,6 +35,8 @@ function POMDPs.update(up::HW6Updater, b::DiscreteBelief, a, o)
     if sum(bp_vec) ≈ 0
         fill!(bp_vec, 1)
     end
+
+    # normalize in return 
     return DiscreteBelief(up.m, bp_vec./sum(bp_vec))
 end
 
@@ -135,7 +138,7 @@ function qmdp_solve(m, discount=discount(m))
     return HW6AlphaVectorPolicy(alphas, acts)
 end
 
-# chatGPT to plot as well
+# chatGPT to plot
 function plot_alpha_vectors(policy, pomdp; title_prefix="")
     # Get state space
     S = ordered_states(pomdp)
@@ -169,12 +172,13 @@ function plot_alpha_vectors(policy, pomdp; title_prefix="")
         # For Tiger, belief vector is [p(left), p(right)] = [p, 1-p]
         values = [alpha[1] * p + alpha[2] * (1-p) for p in b_left]
         
-        # Get action name safely
-        action_idx = actions[i]
+        # Get action name correctly - use actionindex to map properly
+        action = actions[i]
+        action_idx = actionindex(pomdp, action)
         action_label = if 1 <= action_idx <= length(action_names)
             action_names[action_idx]
         else
-            "Action $action_idx"
+            "Unknown Action"
         end
         
         plot!(p, b_left, values, label=action_label)
@@ -210,70 +214,39 @@ end
 
 m = TigerPOMDP()
 
-qmdp_p = qmdp_solve(m)
+println("MY QMDP")
+@show qmdp_p = qmdp_solve(m)
+solver = QMDPSolver()
+println("True qmdp")
+@show V_qmdp_p = solve(solver, m)
 
-# Note: you can use the QMDP.jl package to verify that your QMDP alpha vectors are correct.
 sarsop_p = solve(SARSOPSolver(), m)
+
+##### Plotting
 # comparison = compare_alpha_vectors(qmdp_p, sarsop_p, m)
 # display(comparison)
+
 up = HW6Updater(m)
 
 # @show mean(simulate(RolloutSimulator(max_steps=500), m, qmdp_p, up) for _ in 1:5000)
 # @show mean(simulate(RolloutSimulator(max_steps=500), m, sarsop_p, up) for _ in 1:5000)
 
-# Add this code to compare your updater with DiscreteUpdater
-# used claude to test these
-function compare_updaters()
-    # Create the POMDP
-    tiger = TigerPOMDP()
-    
-    # Create both updaters
-    hw6_updater = HW6Updater(tiger)
-    std_updater = DiscreteUpdater(tiger)
-    
-    # Initialize beliefs from the same distribution
-    initial_dist = initialstate(tiger)
-    hw6_b = initialize_belief(hw6_updater, initial_dist)
-    std_b = initialize_belief(std_updater, initial_dist)
-    
-    # Print initial beliefs
-    println("Initial beliefs:")
-    println("HW6Updater: ", hw6_b.b)
-    println("DiscreteUpdater: ", std_b.b)
-    println("Match: ", all(isapprox.(hw6_b.b, std_b.b, atol=1e-10)))
-    println()
-    
-    # Test sequence of actions and observations
-    action_obs_sequence = [
-        (TIGER_LISTEN, true),
-        (TIGER_LISTEN, false),
-        (TIGER_OPEN_LEFT, false),
-        (TIGER_LISTEN, true),
-        (TIGER_LISTEN, true),
-        (TIGER_OPEN_LEFT, false),
-        (TIGER_OPEN_LEFT, true)
 
 
-    ]
+println("QUESTION 2")
+
+function heuristic_policy(qmdp_p)
+
+    new_alphas = deepcopy(qmdp_p.alphas)
     
-    for (i, (a, o)) in enumerate(action_obs_sequence)
-        # Update both beliefs
-        hw6_b = update(hw6_updater, hw6_b, a, o)
-        std_b = update(std_updater, std_b, a, o)
-        
-        # Print and compare
-        println("After update $i (action: $a, observation: $o):")
-        println("HW6Updater: ", hw6_b.b)
-        println("DiscreteUpdater: ", std_b.b)
-        println("Match: ", all(isapprox.(hw6_b.b, std_b.b, atol=1e-10)))
-        println()
-    end
-    
-    return hw6_b, std_b
+    # stumbled into this kinda on accident, but waits much less when 
+    # patient is healthy, favoring testing, which increases reward
+    new_alphas[1][1] = 1.0
+    # when invasive, treat more often (much less impactful than other option)
+    new_alphas[3][3] = 200.0
+
+    return HW6AlphaVectorPolicy(new_alphas, qmdp_p.alpha_actions)
 end
-
-# Run the comparison
-# hw6_final, std_final = compare_updaters()
 
 cancer = QuickPOMDP(
     states = [:healthy, :in_situ, :invasive, :death],
@@ -335,63 +308,24 @@ cancer = QuickPOMDP(
 )
 @assert has_consistent_distributions(cancer)
 
+@show ordered_states(cancer)
+println("QMDP POLICY")
 @show qmdp_p = qmdp_solve(cancer)
-@show qmdp_p.alphas
-println("SARSOP")
+# qmdp_p.alphas
+println("HEURISTIC")
+@show new_p = heuristic_policy(qmdp_p)
+println("SARSOP POLICY")
 @show sarsop_p = solve(SARSOPSolver(), cancer)
 
 policy = qmdp_p
 sim = RolloutSimulator()
 up = DiscreteUpdater(cancer)
 
+
 println("QMDP")
 @show @time mean(simulate(RolloutSimulator(), cancer, qmdp_p, up) for _ in 1:1000)
+println("HEURISTIC")
+@show @time mean(simulate(RolloutSimulator(), cancer, new_p, up) for _ in 1:1000)
 println("SARSOP")
 
 @show @time mean(POMDPs.simulate(sim, cancer, sarsop_p, up) for _ in 1:1000)
-
-# comparison = compare_alpha_vectors(qmdp_p, sarsop_p, cancer)
-# state_list = POMDPs.states(cancer)
-
-# # Extract alpha vectors from the policy
-# alphas = qmdp_p.alphas
-# actions = qmdp_p.alpha_actions
-
-# # Create a grouped bar plot
-# p = groupedbar(hcat(alphas...)', 
-#                xticks=(1:length(state_list), string.(state_list)),
-#                label=reshape(string.(actions), 1, :),
-#                title="Alpha Vectors from QMDP Solution",
-#                xlabel="States",
-#                ylabel="Value",
-#                legend=:topright,
-#                bar_width=0.7,
-#                lw=0,
-#                alpha=0.8,
-#                framestyle=:box,
-#                fontfamily="Computer Modern")
-
-# display(p)
-
-# state_list_s = POMDPs.states(cancer)
-
-# # Extract alpha vectors from the policy
-# alphas_s = sarsop_p.alphas
-# actions_s = sarsop_p.action_map
-
-# # Create a grouped bar plot
-# p_s = groupedbar(hcat(alphas...)', 
-#                xticks=(1:length(state_list), string.(state_list)),
-#                label=reshape(string.(actions), 1, :),
-#                title="Alpha Vectors from SARSOP Solution",
-#                xlabel="States",
-#                ylabel="Value",
-#                legend=:topright,
-#                bar_width=0.7,
-#                lw=0,
-#                alpha=0.8,
-#                framestyle=:box,
-#                fontfamily="Computer Modern")
-
-# display(p_s)
-
