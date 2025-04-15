@@ -11,61 +11,6 @@ using DiscreteValueIteration: ValueIterationSolver
 
 m = LaserTagPOMDP()
 
-
-function qmdp_solve(m, discount=discount(m))
-
-    # Fill in Value Iteration to compute the Q-values
-    S = ordered_states(m)
-    A = ordered_actions(m)
-    V = zeros(length(S))
-
-    for _ in 1:1000
-        prev = copy(V)
-
-        for (i, s) in enumerate(S)
-            max_q = -Inf
-            for a in A
-                q_sa = reward(m,s,a)
-
-                for sp in S
-                    p_sp = pdf(transition(m,s,a),sp)
-                    ip = stateindex(m, sp)
-                    q_sa += discount * p_sp * prev[ip]
-                end
-                max_q = max(max_q, q_sa)
-            end
-            V[i] = max_q
-        end
-
-        if maximum(abs.(V-prev)) < 1e-6
-            break
-        end
-    end
-
-
-    acts = actiontype(m)[]
-    alphas = Vector{Float64}[]
-    for a in A
-        push!(acts, a)
-
-        a_vec = zeros(length(S))
-
-        for (i, s) in enumerate(S)
-            a_vec[i] = reward(m,s,a)
-
-            for sp in S
-                p_sp = pdf(transition(m,s,a), sp)
-                sp_i = stateindex(m, sp)
-                a_vec[i] += discount * p_sp * V[sp_i]
-            end
-        end
-        # Fill in alpha vector calculation
-        # Note that the ordering of the entries in the alpha vectors must be consistent with stateindex(m, s) (states(m) does not necessarily obey this order, but ordered_states(m) does.)
-        push!(alphas, a_vec)
-    end
-    return HW6AlphaVectorPolicy(alphas, acts)
-end
-
 println("Solving")
 # qmdp_p = qmdp_solve(m)
 up = DiscreteUpdater(m) # you may want to replace this with your updater to test it
@@ -94,36 +39,23 @@ function pomcp_solve(m) # this function makes capturing m in the rollout policy 
     mdp_solver = ValueIterationSolver(max_iterations=100)
     mdp_policy = solve(mdp_solver, mdp)
 
-    solver = POMCPSolver(tree_queries=100,
-                         c=50.0,
+    solver = POMCPSolver(tree_queries=1000,
+                         c=45.0,
                          max_time = 0.4, # this should be enough time to get a score in the 30s
-
                          default_action=:measure,
                          estimate_value=FORollout(mdp_policy))
     return solve(solver, m)
 end
-
-#########
-# best:
-
-# solver = POMCPSolver(tree_queries=10,
-# c=30.0,
-# max_time = 0.2, # this should be enough time to get a score in the 30s
-
-# default_action=:measure,
-# estimate_value=FORollout(mdp_policy))
-# return solve(solver, m)
-#####
 
 
 println("solving pomcp")
 pomcp_p = pomcp_solve(m)
 
 println("eval:")
-# @show HW6.evaluate((pomcp_p, up), n_episodes=100)
+@show HW6.evaluate((pomcp_p, up), n_episodes=100)
 
 # When you get ready to submit, use this version with the full 1000 episodes
-HW6.evaluate((pomcp_p, up), "xavier.okeefe@colorado.edu")
+# HW6.evaluate((pomcp_p, up), "xavier.okeefe@colorado.edu")
 
 #----------------
 # Visualization
