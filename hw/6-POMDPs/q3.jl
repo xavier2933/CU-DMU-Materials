@@ -90,11 +90,11 @@ function pomcp_solve(m) # this function makes capturing m in the rollout policy 
 
     mdp = UnderlyingMDP(m)
     
-    # Solve the MDP to get a good policy for rollouts
-    mdp_solver = ValueIterationSolver(max_iterations=100)
+    # solve mdp to get decent policy for rollout
+    mdp_solver = ValueIterationSolver(max_iterations=1000)
     mdp_policy = solve(mdp_solver, mdp)
 
-    solver = POMCPSolver(tree_queries=100,
+    solver = POMCPSolver(tree_queries=1,
                          c=50.0,
                          max_time = 0.4, # this should be enough time to get a score in the 30s
 

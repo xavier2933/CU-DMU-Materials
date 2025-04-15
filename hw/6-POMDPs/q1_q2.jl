@@ -8,6 +8,7 @@ using POMDPTesting: has_consistent_distributions
 using Plots
 using StatsPlots
 using QMDP
+using Statistics
 
 
 ##################
@@ -68,12 +69,10 @@ struct HW6AlphaVectorPolicy{A} <: Policy
 end
 
 function POMDPs.action(p::HW6AlphaVectorPolicy, b::DiscreteBelief)
-    # Get belief as a vector
     
-    # Calculate value for each alpha vector (dot product)
+    # dot porduct to get value
     values = [sum(alpha .* b.b) for alpha in p.alphas]
     
-    # Choose action with highest value
     best_idx = argmax(values)
     return p.alpha_actions[best_idx]
 end
@@ -89,13 +88,13 @@ function qmdp_solve(m, discount=discount(m))
     # Fill in Value Iteration to compute the Q-values
     S = ordered_states(m)
     A = ordered_actions(m)
-    V = zeros(length(S))
+    U = zeros(length(S))
 
     for _ in 1:1000
-        prev = copy(V)
+        prev = copy(U)
 
         for (i, s) in enumerate(S)
-            max_q = -Inf
+            max_q = -999
             for a in A
                 q_sa = reward(m,s,a)
 
@@ -106,17 +105,18 @@ function qmdp_solve(m, discount=discount(m))
                 end
                 max_q = max(max_q, q_sa)
             end
-            V[i] = max_q
+
+            U[i] = max_q
         end
 
-        if maximum(abs.(V-prev)) < 1e-6
+        if maximum(abs.(U-prev)) < 1e-6
             break
         end
     end
 
-
     acts = actiontype(m)[]
     alphas = Vector{Float64}[]
+
     for a in A
         push!(acts, a)
 
@@ -128,7 +128,7 @@ function qmdp_solve(m, discount=discount(m))
             for sp in S
                 p_sp = pdf(transition(m,s,a), sp)
                 sp_i = stateindex(m, sp)
-                a_vec[i] += discount * p_sp * V[sp_i]
+                a_vec[i] += discount * p_sp * U[sp_i]
             end
         end
         # Fill in alpha vector calculation
@@ -228,8 +228,13 @@ sarsop_p = solve(SARSOPSolver(), m)
 
 up = HW6Updater(m)
 
-# @show mean(simulate(RolloutSimulator(max_steps=500), m, qmdp_p, up) for _ in 1:5000)
-# @show mean(simulate(RolloutSimulator(max_steps=500), m, sarsop_p, up) for _ in 1:5000)
+qmdp_res = [simulate(RolloutSimulator(max_steps=500), m, qmdp_p, up) for _ in 1:5000]
+@show mean(qmdp_res)
+@show std(qmdp_res)/sqrt(length(qmdp_res))
+
+sarsop_res = [simulate(RolloutSimulator(max_steps=500), m, sarsop_p, up) for _ in 1:5000]
+@show mean(sarsop_res)
+@show std(sarsop_res)/sqrt(length(sarsop_res))
 
 
 
