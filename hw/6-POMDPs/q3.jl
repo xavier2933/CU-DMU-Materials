@@ -32,7 +32,8 @@ up = DiscreteUpdater(m) # you may want to replace this with your updater to test
 # A good approach to try is POMCP, implemented in the BasicPOMCP.jl package:
 using BasicPOMCP
 function pomcp_solve(m) # this function makes capturing m in the rollout policy more efficient
-
+    c_val = 50.0
+    println("C=$c_val")
     mdp = UnderlyingMDP(m)
     
     # solve mdp to get decent policy for rollout
@@ -40,8 +41,8 @@ function pomcp_solve(m) # this function makes capturing m in the rollout policy 
     mdp_policy = solve(mdp_solver, mdp)
 
     solver = POMCPSolver(tree_queries=1000,
-                         c=45.0,
-                         max_time = 0.4, # this should be enough time to get a score in the 30s
+                         c=c_val,
+                         max_time = 0.5, # this should be enough time to get a score in the 30s
                          default_action=:measure,
                          estimate_value=FORollout(mdp_policy))
     return solve(solver, m)
@@ -52,10 +53,10 @@ println("solving pomcp")
 pomcp_p = pomcp_solve(m)
 
 println("eval:")
-@show HW6.evaluate((pomcp_p, up), n_episodes=100)
+# @show HW6.evaluate((pomcp_p, up), n_episodes=100)
 
 # When you get ready to submit, use this version with the full 1000 episodes
-# HW6.evaluate((pomcp_p, up), "xavier.okeefe@colorado.edu")
+HW6.evaluate((pomcp_p, up), "xavier.okeefe@colorado.edu")
 
 #----------------
 # Visualization
